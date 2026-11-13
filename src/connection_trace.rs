@@ -4,6 +4,7 @@
 //! path it did, or where it stalled. Pure diagnostics: nothing here feeds back
 //! into the connection.
 
+use hbb_common::log;
 use std::{collections::HashMap, sync::Mutex, time::Instant};
 
 /// Cap per peer so a stuck, retrying attempt can't grow the buffer without bound.
