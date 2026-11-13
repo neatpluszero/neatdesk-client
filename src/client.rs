@@ -5036,6 +5036,8 @@ pub trait Interface: Send + Clone + 'static + Sized {
         // relay-hint
         if cfg!(feature = "flutter") && relay_hint {
             self.msgbox(relay_hint_type, title, &text, "");
+        } else if err.contains("deadline") || err.contains("Failed to secure tcp") {
+            self.msgbox("error", title, "connect_timeout_tip", "");
         } else {
             self.msgbox("error", title, &text, "");
         }

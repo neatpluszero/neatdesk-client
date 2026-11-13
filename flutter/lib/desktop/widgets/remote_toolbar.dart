@@ -851,6 +851,9 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       toolbarItems.add(_VoiceCallMenu(id: widget.id, ffi: widget.ffi));
     }
     if (!isWeb) toolbarItems.add(_RecordMenu());
+    if (mainGetLocalBoolOptionSync(kOptionEnableDeveloperMode)) {
+      toolbarItems.add(_DeveloperMenu(id: widget.id, ffi: widget.ffi));
+    }
     toolbarItems.add(_CloseMenu(id: widget.id, ffi: widget.ffi));
     final toolbarBorderRadius = BorderRadius.all(Radius.circular(4.0));
     // innerAxis: how the toolbar icons themselves flow.
@@ -3018,6 +3021,142 @@ class _CloseMenu extends StatelessWidget {
       },
       color: _ToolbarTheme.redColor,
       hoverColor: _ToolbarTheme.hoverRedColor,
+    );
+  }
+}
+
+class _DeveloperMenu extends StatelessWidget {
+  final String id;
+  final FFI ffi;
+  const _DeveloperMenu({Key? key, required this.id, required this.ffi})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return _IconMenuButton(
+      icon: Icon(
+        Icons.bug_report_outlined,
+        size: _ToolbarTheme.buttonSize,
+        color: Colors.white,
+      ),
+      tooltip: 'Connection trace',
+      onPressed: () => _showConnectionTrace(context, id, ffi),
+      color: _ToolbarTheme.blueColor,
+      hoverColor: _ToolbarTheme.hoverBlueColor,
+    );
+  }
+
+  void _showConnectionTrace(BuildContext context, String id, FFI ffi) {
+    ffi.dialogManager.show((setState, close, context) {
+      return CustomAlertDialog(
+        title: Text(translate('Connection trace')),
+        content: _ConnectionTraceView(id: id),
+        actions: [
+          dialogButton('Copy', isOutline: true, onPressed: () {
+            Clipboard.setData(
+                ClipboardData(text: bind.mainGetConnectionTrace(id: id)));
+          }),
+          dialogButton('Close', onPressed: close),
+        ],
+      );
+    });
+  }
+}
+
+class _ConnectionTraceView extends StatefulWidget {
+  final String id;
+  const _ConnectionTraceView({Key? key, required this.id}) : super(key: key);
+
+  @override
+  State<_ConnectionTraceView> createState() => _ConnectionTraceViewState();
+}
+
+class _ConnectionTraceViewState extends State<_ConnectionTraceView> {
+  Timer? _timer;
+  List<dynamic> _entries = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _refresh());
+  }
+
+  void _refresh() {
+    try {
+      final decoded = jsonDecode(bind.mainGetConnectionTrace(id: widget.id));
+      if (mounted && decoded is List) {
+        setState(() => _entries = decoded);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Color _stageColor(String stage) {
+    switch (stage) {
+      case 'failed':
+        return Colors.red;
+      case 'direct':
+        return Colors.green;
+      case 'relay':
+        return Colors.orange;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_entries.isEmpty) {
+      return SizedBox(
+        width: 460,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(translate('No connection trace yet')),
+        ),
+      );
+    }
+    return SizedBox(
+      width: 460,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 340),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _entries.map((e) {
+              final stage = e['stage']?.toString() ?? '';
+              final detail = e['detail']?.toString() ?? '';
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 60,
+                      child: Text('${e['ms']}ms',
+                          style: const TextStyle(color: Colors.grey)),
+                    ),
+                    SizedBox(
+                      width: 82,
+                      child: Text(stage,
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _stageColor(stage))),
+                    ),
+                    Expanded(child: SelectableText(detail)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
     );
   }
 }

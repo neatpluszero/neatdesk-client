@@ -644,6 +644,15 @@ class _GeneralState extends State<_General> {
             isServer: false,
           ),
         ),
+      Tooltip(
+        message: translate('developer-mode-tip'),
+        child: _OptionCheckBox(
+          context,
+          'Developer mode',
+          kOptionEnableDeveloperMode,
+          isServer: false,
+        ),
+      ),
     ];
 
     // Add client-side wakelock option for desktop platforms

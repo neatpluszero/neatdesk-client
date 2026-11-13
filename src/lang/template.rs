@@ -826,5 +826,10 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", ""),
         ("Request approval", ""),
         ("Forever", ""),
+        ("Developer mode", ""),
+        ("developer-mode-tip", ""),
+        ("Connection trace", ""),
+        ("No connection trace yet", ""),
+        ("connect_timeout_tip", ""),
     ].iter().cloned().collect();
 }
