@@ -596,6 +596,7 @@ abstract class BasePeerCard extends StatelessWidget {
     menuItems.add(_requestApprovalAction(context));
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
+      menuItems.add(_connectViaRelayAction(context));
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
     }
     return menuItems;
@@ -854,6 +855,18 @@ abstract class BasePeerCard extends StatelessWidget {
             key: kOptionForceAlwaysRelay,
             value: bool2option(kOptionForceAlwaysRelay, v));
         showToast(translate('Successful'));
+      },
+      padding: menuPadding,
+      dismissOnClicked: true,
+    );
+  }
+
+  MenuEntryBase<String> _connectViaRelayAction(BuildContext context) {
+    return MenuEntryButton<String>(
+      childBuilder: (TextStyle? style) =>
+          Text(translate('Connect via relay'), style: style),
+      proc: () {
+        connectInPeerTab(context, peer, tab, forceRelay: true);
       },
       padding: menuPadding,
       dismissOnClicked: true,
@@ -1570,6 +1583,7 @@ void connectInPeerTab(BuildContext context, Peer peer, PeerTabIndex tab,
     bool isTcpTunneling = false,
     bool isRDP = false,
     bool isTerminal = false,
+    bool forceRelay = false,
     String loginMethod = ''}) async {
   var password = '';
   bool isSharedPassword = false;
@@ -1605,5 +1619,6 @@ void connectInPeerTab(BuildContext context, Peer peer, PeerTabIndex tab,
       isTerminal: isTerminal,
       isViewCamera: isViewCamera,
       isTcpTunneling: isTcpTunneling,
-      isRDP: isRDP);
+      isRDP: isRDP,
+      forceRelay: forceRelay);
 }

@@ -831,5 +831,6 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Connection trace", ""),
         ("No connection trace yet", ""),
         ("connect_timeout_tip", ""),
+        ("Connect via relay", ""),
     ].iter().cloned().collect();
 }
