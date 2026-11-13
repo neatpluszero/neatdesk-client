@@ -390,6 +390,7 @@ impl Client {
         debug_assert!(peer == interface.get_id());
         interface.update_direct(None);
         interface.update_received(false);
+        crate::connection_trace::begin(peer);
         match Self::_start(peer, key, token, conn_type, interface.clone()).await {
             Err(err) => {
                 let err_str = err.to_string();
@@ -842,6 +843,7 @@ impl Client {
             crate::refresh_rendezvous_server();
         }
         log::info!("rendezvous server: {}", rendezvous_server);
+        crate::connection_trace::push(&peer, "rendezvous", &rendezvous_server);
         let mut socket = socket?;
         let mut my_addr = socket.local_addr();
         let mut signed_id_pk = Vec::new();
@@ -1365,6 +1367,14 @@ impl Client {
             } else {
                 format!("nat_type: {:?}", peer_nat_type)
             }
+        );
+        crate::connection_trace::push(
+            &peer,
+            if relay_server.is_empty() { "direct" } else { "relay" },
+            &format!(
+                "{} punch in {}ms, relay_server: {}",
+                punch_type, time_used, relay_server
+            ),
         );
         Ok((
             Self::connect(
@@ -5010,6 +5020,7 @@ pub trait Interface: Send + Clone + 'static + Sized {
         // force relay
         let errno = errno::errno().0;
         log::error!("Connection closed: {err}({errno})");
+        crate::connection_trace::push(&self.get_id(), "failed", &format!("{err} ({errno})"));
         if direct == Some(true)
             && ((cfg!(windows) && (errno == 10054 || err.contains("10054")))
                 || (!cfg!(windows) && (errno == 104 || err.contains("104")))

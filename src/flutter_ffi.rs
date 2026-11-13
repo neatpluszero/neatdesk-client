@@ -1150,6 +1150,12 @@ pub fn main_get_app_name_sync() -> SyncReturn<String> {
     SyncReturn(get_app_name())
 }
 
+// Developer mode: the connection-attempt trace for a peer, as a JSON array of
+// {ms, stage, detail}. Empty array when there is none.
+pub fn main_get_connection_trace(id: String) -> SyncReturn<String> {
+    SyncReturn(crate::connection_trace::get_json(&id))
+}
+
 pub fn main_uri_prefix_sync() -> SyncReturn<String> {
     SyncReturn(crate::get_uri_prefix())
 }

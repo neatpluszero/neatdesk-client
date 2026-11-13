@@ -875,6 +875,12 @@ class RustdeskImpl {
     return js.context.callMethod('getByName', ['app-name']);
   }
 
+  // Web has no native connection trace (the JS client owns the session), so the
+  // developer-mode trace is empty here.
+  String mainGetConnectionTrace({required String id, dynamic hint}) {
+    return "[]";
+  }
+
   String mainUriPrefixSync({dynamic hint}) {
     throw UnimplementedError("mainUriPrefixSync");
   }
