@@ -2993,13 +2993,16 @@ impl LoginConfigHandler {
         self.session_id = sid;
         self.supported_encoding = Default::default();
         self.clear_restarting_remote_device();
-        // Three scopes: what was decided about this PEER, what this CLIENT is set up as (proxy),
-        // and what its TRANSPORT forces (ws). Only the first may be written back to the peer's
-        // config — persisting the others would make a local setup a permanent peer property.
+        // Three scopes: what was decided about this PEER (the saved force-always-relay
+        // preference), what this CLIENT is set up as (proxy), and what its TRANSPORT forces (ws).
+        // Only the first may be written back to the peer's config — persisting the others would
+        // make a local setup a permanent peer property. A one-shot relay request (force_relay:
+        // the "Connect via relay" action, a ?relay URI, or an id/r suffix) routes this session
+        // over the relay but is not a saved preference, so it feeds policy_relay, not peer_relay;
+        // the explicit "Always connect via relay" toggle is what persists force-always-relay.
         self.peer_relay =
-            config::option2bool("force-always-relay", &self.get_option("force-always-relay"))
-                || force_relay;
-        self.policy_relay = self.peer_relay || Config::is_proxy();
+            config::option2bool("force-always-relay", &self.get_option("force-always-relay"));
+        self.policy_relay = self.peer_relay || force_relay || Config::is_proxy();
         self.force_relay = self.policy_relay || use_ws();
         if let Some((real_id, server, key)) = &self.other_server {
             let other_server_key = self.get_option("other-server-key");
