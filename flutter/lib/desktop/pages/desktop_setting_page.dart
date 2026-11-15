@@ -1466,9 +1466,14 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
       shareRdp(context, enabled),
       _OptionCheckBox(context, 'Deny LAN discovery', 'enable-lan-discovery',
           reverse: true, enabled: enabled),
-      ...directIp(context),
-      whitelist(),
-      idWhitelist(),
+      // These direct-access controls now live on the Network tab. When a custom client
+      // hides the Network tab, fall back to rendering them here (their upstream home) so
+      // they stay reachable, matching the original visibility.
+      if (bind.mainGetBuildinOption(key: kOptionHideNetworkSetting) == 'Y') ...[
+        ..._directIpWidgets(context, locked, () => setState(() {})),
+        _whitelistWidget(context, locked),
+        _idWhitelistWidget(context, locked),
+      ],
       ...autoDisconnect(context),
       _OptionCheckBox(context, 'keep-awake-during-incoming-sessions-label',
           kOptionKeepAwakeDuringIncomingSessions,
@@ -1506,170 +1511,6 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
           ).marginOnly(left: _kCheckBoxLeftMargin),
           onTap: enabled ? () => onChanged(!value) : null),
     );
-  }
-
-  List<Widget> directIp(BuildContext context) {
-    TextEditingController controller = TextEditingController();
-    update(bool v) => setState(() {});
-    RxBool applyEnabled = false.obs;
-    return [
-      _OptionCheckBox(context, 'Enable direct IP access', kOptionDirectServer,
-          update: update, enabled: !locked),
-      () {
-        // Simple temp wrapper for PR check
-        tmpWrapper() {
-          bool enabled = option2bool(kOptionDirectServer,
-              bind.mainGetOptionSync(key: kOptionDirectServer));
-          if (!enabled) applyEnabled.value = false;
-          controller.text =
-              bind.mainGetOptionSync(key: kOptionDirectAccessPort);
-          final isOptFixed = isOptionFixed(kOptionDirectAccessPort);
-          return Offstage(
-            offstage: !enabled,
-            child: _SubLabeledWidget(
-              context,
-              'Port',
-              Row(children: [
-                SizedBox(
-                  width: 95,
-                  child: TextField(
-                    controller: controller,
-                    enabled: enabled && !locked && !isOptFixed,
-                    onChanged: (_) => applyEnabled.value = true,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(
-                          r'^([0-9]|[1-9]\d|[1-9]\d{2}|[1-9]\d{3}|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5])$')),
-                    ],
-                    decoration: const InputDecoration(
-                      hintText: '21118',
-                      contentPadding:
-                          EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                    ),
-                  ).workaroundFreezeLinuxMint().marginOnly(right: 15),
-                ),
-                Obx(() => ElevatedButton(
-                      onPressed: applyEnabled.value &&
-                              enabled &&
-                              !locked &&
-                              !isOptFixed
-                          ? () async {
-                              applyEnabled.value = false;
-                              await bind.mainSetOption(
-                                  key: kOptionDirectAccessPort,
-                                  value: controller.text);
-                            }
-                          : null,
-                      child: Text(
-                        translate('Apply'),
-                      ),
-                    ))
-              ]),
-              enabled: enabled && !locked && !isOptFixed,
-            ),
-          );
-        }
-
-        return tmpWrapper();
-      }(),
-    ];
-  }
-
-  Widget whitelist() {
-    bool enabled = !locked;
-    // Simple temp wrapper for PR check
-    tmpWrapper() {
-      RxBool hasWhitelist = whitelistNotEmpty().obs;
-      update() async {
-        hasWhitelist.value = whitelistNotEmpty();
-      }
-
-      onChanged(bool? checked) async {
-        changeWhiteList(callback: update);
-      }
-
-      final isOptFixed = isOptionFixed(kOptionWhitelist);
-      return GestureDetector(
-        child: Tooltip(
-          message: translate('whitelist_tip'),
-          child: Obx(() => Row(
-                children: [
-                  Checkbox(
-                          value: hasWhitelist.value,
-                          onChanged: enabled && !isOptFixed ? onChanged : null)
-                      .marginOnly(right: 5),
-                  Offstage(
-                    offstage: !hasWhitelist.value,
-                    child: MouseRegion(
-                      child: const Icon(Icons.warning_amber_rounded,
-                              color: Color.fromARGB(255, 255, 204, 0))
-                          .marginOnly(right: 5),
-                      cursor: SystemMouseCursors.click,
-                    ),
-                  ),
-                  Expanded(
-                      child: Text(
-                    translate('Use IP Whitelisting'),
-                    style:
-                        TextStyle(color: disabledTextColor(context, enabled)),
-                  ))
-                ],
-              )),
-        ),
-        onTap: enabled
-            ? () {
-                onChanged(!hasWhitelist.value);
-              }
-            : null,
-      ).marginOnly(left: _kCheckBoxLeftMargin);
-    }
-
-    return tmpWrapper();
-  }
-
-  Widget idWhitelist() {
-    bool enabled = !locked;
-    RxBool hasIdWhitelist = idWhitelistNotEmpty().obs;
-    update() async {
-      hasIdWhitelist.value = idWhitelistNotEmpty();
-    }
-
-    onChanged(bool? checked) async {
-      changeIdWhiteList(callback: update);
-    }
-
-    final isOptFixed = isOptionFixed(kOptionIdWhitelist);
-    return GestureDetector(
-      child: Tooltip(
-        message: translate('id_whitelist_tip'),
-        child: Obx(() => Row(
-              children: [
-                Checkbox(
-                        value: hasIdWhitelist.value,
-                        onChanged: enabled && !isOptFixed ? onChanged : null)
-                    .marginOnly(right: 5),
-                Offstage(
-                  offstage: !hasIdWhitelist.value,
-                  child: MouseRegion(
-                    child: const Icon(Icons.warning_amber_rounded,
-                            color: Color.fromARGB(255, 255, 204, 0))
-                        .marginOnly(right: 5),
-                    cursor: SystemMouseCursors.click,
-                  ),
-                ),
-                Expanded(
-                    child: Text(
-                  translate('Use ID whitelisting'),
-                  style: TextStyle(color: disabledTextColor(context, enabled)),
-                ))
-              ],
-            )),
-      ),
-      onTap: enabled
-          ? () {
-              onChanged(!hasIdWhitelist.value);
-            }
-          : null,
-    ).marginOnly(left: _kCheckBoxLeftMargin);
   }
 
   Widget hide_cm(bool enabled) {
@@ -1807,6 +1648,170 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
   }
 }
 
+// Incoming direct-access controls, shared by the Network tab (normal placement) and
+// the Security tab (fallback when the Network tab is hidden). `locked` and `refresh`
+// come from the hosting State so the port field can rebuild on toggle.
+List<Widget> _directIpWidgets(
+    BuildContext context, bool locked, VoidCallback refresh) {
+  TextEditingController controller = TextEditingController();
+  update(bool v) => refresh();
+  RxBool applyEnabled = false.obs;
+  return [
+    _OptionCheckBox(context, 'Enable direct IP access', kOptionDirectServer,
+        update: update, enabled: !locked),
+    () {
+      // Simple temp wrapper for PR check
+      tmpWrapper() {
+        bool enabled = option2bool(kOptionDirectServer,
+            bind.mainGetOptionSync(key: kOptionDirectServer));
+        if (!enabled) applyEnabled.value = false;
+        controller.text = bind.mainGetOptionSync(key: kOptionDirectAccessPort);
+        final isOptFixed = isOptionFixed(kOptionDirectAccessPort);
+        return Offstage(
+          offstage: !enabled,
+          child: _SubLabeledWidget(
+            context,
+            'Port',
+            Row(children: [
+              SizedBox(
+                width: 95,
+                child: TextField(
+                  controller: controller,
+                  enabled: enabled && !locked && !isOptFixed,
+                  onChanged: (_) => applyEnabled.value = true,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(
+                        r'^([0-9]|[1-9]\d|[1-9]\d{2}|[1-9]\d{3}|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5])$')),
+                  ],
+                  decoration: const InputDecoration(
+                    hintText: '21118',
+                    contentPadding:
+                        EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                  ),
+                ).workaroundFreezeLinuxMint().marginOnly(right: 15),
+              ),
+              Obx(() => ElevatedButton(
+                    onPressed:
+                        applyEnabled.value && enabled && !locked && !isOptFixed
+                            ? () async {
+                                applyEnabled.value = false;
+                                await bind.mainSetOption(
+                                    key: kOptionDirectAccessPort,
+                                    value: controller.text);
+                              }
+                            : null,
+                    child: Text(
+                      translate('Apply'),
+                    ),
+                  ))
+            ]),
+            enabled: enabled && !locked && !isOptFixed,
+          ),
+        );
+      }
+
+      return tmpWrapper();
+    }(),
+  ];
+}
+
+Widget _whitelistWidget(BuildContext context, bool locked) {
+  bool enabled = !locked;
+  // Simple temp wrapper for PR check
+  tmpWrapper() {
+    RxBool hasWhitelist = whitelistNotEmpty().obs;
+    update() async {
+      hasWhitelist.value = whitelistNotEmpty();
+    }
+
+    onChanged(bool? checked) async {
+      changeWhiteList(callback: update);
+    }
+
+    final isOptFixed = isOptionFixed(kOptionWhitelist);
+    return GestureDetector(
+      child: Tooltip(
+        message: translate('whitelist_tip'),
+        child: Obx(() => Row(
+              children: [
+                Checkbox(
+                        value: hasWhitelist.value,
+                        onChanged: enabled && !isOptFixed ? onChanged : null)
+                    .marginOnly(right: 5),
+                Offstage(
+                  offstage: !hasWhitelist.value,
+                  child: MouseRegion(
+                    child: const Icon(Icons.warning_amber_rounded,
+                            color: Color.fromARGB(255, 255, 204, 0))
+                        .marginOnly(right: 5),
+                    cursor: SystemMouseCursors.click,
+                  ),
+                ),
+                Expanded(
+                    child: Text(
+                  translate('Use IP Whitelisting'),
+                  style: TextStyle(color: disabledTextColor(context, enabled)),
+                ))
+              ],
+            )),
+      ),
+      onTap: enabled
+          ? () {
+              onChanged(!hasWhitelist.value);
+            }
+          : null,
+    ).marginOnly(left: _kCheckBoxLeftMargin);
+  }
+
+  return tmpWrapper();
+}
+
+Widget _idWhitelistWidget(BuildContext context, bool locked) {
+  bool enabled = !locked;
+  RxBool hasIdWhitelist = idWhitelistNotEmpty().obs;
+  update() async {
+    hasIdWhitelist.value = idWhitelistNotEmpty();
+  }
+
+  onChanged(bool? checked) async {
+    changeIdWhiteList(callback: update);
+  }
+
+  final isOptFixed = isOptionFixed(kOptionIdWhitelist);
+  return GestureDetector(
+    child: Tooltip(
+      message: translate('id_whitelist_tip'),
+      child: Obx(() => Row(
+            children: [
+              Checkbox(
+                      value: hasIdWhitelist.value,
+                      onChanged: enabled && !isOptFixed ? onChanged : null)
+                  .marginOnly(right: 5),
+              Offstage(
+                offstage: !hasIdWhitelist.value,
+                child: MouseRegion(
+                  child: const Icon(Icons.warning_amber_rounded,
+                          color: Color.fromARGB(255, 255, 204, 0))
+                      .marginOnly(right: 5),
+                  cursor: SystemMouseCursors.click,
+                ),
+              ),
+              Expanded(
+                  child: Text(
+                translate('Use ID whitelisting'),
+                style: TextStyle(color: disabledTextColor(context, enabled)),
+              ))
+            ],
+          )),
+    ),
+    onTap: enabled
+        ? () {
+            onChanged(!hasIdWhitelist.value);
+          }
+        : null,
+  ).marginOnly(left: _kCheckBoxLeftMargin);
+}
+
 class _Network extends StatefulWidget {
   const _Network({Key? key}) : super(key: key);
 
@@ -1833,9 +1838,25 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
         block: locked,
         child: Column(children: [
           network(context),
+          // Incoming-server controls: keep the Security tab's original visibility —
+          // not on web, not in outgoing-only mode, and still suppressed by
+          // hide-security-setting — since the Network tab is shown in cases where
+          // the Security tab (which previously hosted these) was not.
+          if (!isWeb &&
+              !bind.isOutgoingOnly() &&
+              bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
+            directAccess(context),
         ]),
       ),
     ]).marginOnly(bottom: _kListViewBottomMargin);
+  }
+
+  Widget directAccess(BuildContext context) {
+    return _Card(title: 'Direct IP Access', children: [
+      ..._directIpWidgets(context, locked, () => setState(() {})),
+      _whitelistWidget(context, locked),
+      _idWhitelistWidget(context, locked),
+    ]);
   }
 
   Widget network(BuildContext context) {
