@@ -184,6 +184,10 @@ pub const OPTION_KEEP_AWAKE_DURING_OUTGOING_SESSIONS: &str = "keep-awake-during-
 pub const OPTION_DISABLE_GROUP_PANEL: &str = "disable-group-panel";
 pub const OPTION_DISABLE_DISCOVERY_PANEL: &str = "disable-discovery-panel";
 pub const OPTION_PRE_ELEVATE_SERVICE: &str = "pre-elevate-service";
+// Client-side opt-in (off by default): probe direct-IP / domain:port address-book peers
+// for reachability with a bounded, short direct TCP connect, instead of leaving them with
+// no presence (hbbs only knows registered IDs). TCP accept is weaker than ID presence.
+pub const OPTION_PROBE_DIRECT_IP_REACHABLE: &str = "probe-direct-ip-reachable";
 
 // DEFAULT_DISPLAY_SETTINGS, OVERWRITE_DISPLAY_SETTINGS
 pub const KEYS_DISPLAY_SETTINGS: &[&str] = &[
@@ -249,6 +253,7 @@ pub const KEYS_LOCAL_SETTINGS: &[&str] = &[
     OPTION_DISABLE_GROUP_PANEL,
     OPTION_DISABLE_DISCOVERY_PANEL,
     OPTION_PRE_ELEVATE_SERVICE,
+    OPTION_PROBE_DIRECT_IP_REACHABLE,
     OPTION_ALLOW_REMOTE_CM_MODIFICATION,
     OPTION_ALLOW_SYNC_CLIPBOARD_BETWEEN_SESSIONS,
     OPTION_ENABLE_CHECK_UPDATE,

@@ -5370,16 +5370,140 @@ pub mod peer_online {
             let offlines = onlines.drain((onlines.len() / 2)..).collect();
             f(onlines, offlines)
         } else {
+            // Direct-IP / domain:port peers are unknown to hbbs (it only tracks registered
+            // IDs). When the user opts in and such a peer is present, probe its reachability
+            // with a bounded direct TCP connect and merge that with the hbbs answer for the ID
+            // peers. With the option off (or no direct peer) every id goes to hbbs exactly as
+            // before.
+            let probe_direct = hbb_common::config::LocalConfig::get_option(
+                base::config::keys::OPTION_PROBE_DIRECT_IP_REACHABLE,
+            ) == "Y"
+                && ids
+                    .iter()
+                    .any(|id| hbb_common::is_ip_str(id) || hbb_common::is_domain_port_str(id));
             let query_timeout = std::time::Duration::from_millis(3_000);
-            match query_online_states_(&ids, query_timeout).await {
-                Ok((onlines, offlines)) => {
-                    f(onlines, offlines);
-                }
-                Err(e) => {
-                    log::debug!("query onlines, {}", &e);
+            if probe_direct {
+                let (direct_ids, hbbs_ids): (Vec<String>, Vec<String>) =
+                    ids.into_iter().partition(|id| {
+                        hbb_common::is_ip_str(id) || hbb_common::is_domain_port_str(id)
+                    });
+                let hbbs = async move {
+                    if hbbs_ids.is_empty() {
+                        (Vec::new(), Vec::new())
+                    } else {
+                        match query_online_states_(&hbbs_ids, query_timeout).await {
+                            Ok(r) => r,
+                            Err(e) => {
+                                // Omit the ID peers from both lists on error so their
+                                // presence is retained (as the non-probe path does), while
+                                // the direct-peer results below are still published.
+                                log::debug!("query onlines, {}", &e);
+                                (Vec::new(), Vec::new())
+                            }
+                        }
+                    }
+                };
+                let ((mut onlines, mut offlines), (direct_on, direct_off)) =
+                    hbb_common::futures::future::join(hbbs, probe_direct_reachable(direct_ids))
+                        .await;
+                onlines.extend(direct_on);
+                offlines.extend(direct_off);
+                f(onlines, offlines);
+            } else {
+                match query_online_states_(&ids, query_timeout).await {
+                    Ok((onlines, offlines)) => {
+                        f(onlines, offlines);
+                    }
+                    Err(e) => {
+                        log::debug!("query onlines, {}", &e);
+                    }
                 }
             }
         }
+    }
+
+    lazy_static::lazy_static! {
+        // Last direct-reachability probe per peer, to throttle actual TCP connects well below
+        // the UI's query cadence (~6s): a peer probed within PROBE_THROTTLE reuses its result.
+        static ref DIRECT_PROBE_CACHE: std::sync::Mutex<
+            std::collections::HashMap<String, (std::time::Instant, bool)>,
+        > = Default::default();
+    }
+
+    // Reachability (not identity) of direct-IP / domain:port peers: a bounded, short-lived
+    // direct TCP connect to each peer's direct-access port. Kept strictly separate from the
+    // session/login path; TCP accept only means the port answered.
+    async fn probe_direct_reachable(ids: Vec<String>) -> (Vec<String>, Vec<String>) {
+        use hbb_common::{
+            config::RELAY_PORT,
+            futures::stream::{self, StreamExt},
+            socket_client::{check_port, connect_tcp_local},
+            tokio,
+        };
+        use std::time::{Duration, Instant};
+
+        // A slow endpoint must not delay ID-peer presence (the shared runner is single-slot),
+        // so each connect is short and the whole batch has a hard deadline.
+        const PROBE_TIMEOUT_MS: u64 = 1_000;
+        const BATCH_DEADLINE: Duration = Duration::from_secs(3);
+        const PROBE_THROTTLE: Duration = Duration::from_secs(60);
+        const MAX_CONCURRENT: usize = 8;
+
+        let now = Instant::now();
+        let mut onlines = Vec::new();
+        let mut offlines = Vec::new();
+        let mut to_probe = Vec::new();
+        {
+            let cache = DIRECT_PROBE_CACHE.lock().unwrap();
+            for id in ids {
+                match cache.get(&id) {
+                    Some((t, reachable)) if now.duration_since(*t) < PROBE_THROTTLE => {
+                        if *reachable {
+                            onlines.push(id);
+                        } else {
+                            offlines.push(id);
+                        }
+                    }
+                    _ => to_probe.push(id),
+                }
+            }
+        }
+        if to_probe.is_empty() {
+            return (onlines, offlines);
+        }
+
+        // Consume probe results as they arrive, up to a hard deadline, caching each so
+        // repeated queries respect the throttle. Peers not reached by the deadline are left
+        // out of both result lists (their presence is retained) and retried on the next
+        // query, rather than being misreported as unreachable.
+        let deadline = tokio::time::Instant::now() + BATCH_DEADLINE;
+        let mut stream = stream::iter(to_probe)
+            .map(|id| async move {
+                let reachable =
+                    connect_tcp_local(check_port(&id, RELAY_PORT + 1), None, PROBE_TIMEOUT_MS)
+                        .await
+                        .is_ok();
+                (id, reachable)
+            })
+            .buffer_unordered(MAX_CONCURRENT);
+        loop {
+            match tokio::time::timeout_at(deadline, stream.next()).await {
+                Ok(Some((id, reachable))) => {
+                    DIRECT_PROBE_CACHE
+                        .lock()
+                        .unwrap()
+                        .insert(id.clone(), (Instant::now(), reachable));
+                    if reachable {
+                        onlines.push(id);
+                    } else {
+                        offlines.push(id);
+                    }
+                }
+                Ok(None) => break,
+                Err(_) => break,
+            }
+        }
+        (onlines, offlines)
     }
 
     async fn create_online_stream() -> ResultType<Stream> {
