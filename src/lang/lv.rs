@@ -830,5 +830,6 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("probe_direct_ip_reachable_tip", ""),
         ("Reachable", ""),
         ("Unreachable", ""),
+        ("LAN", ""),
     ].iter().cloned().collect();
 }
