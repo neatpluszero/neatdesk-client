@@ -175,7 +175,7 @@ async fn connect_and_login(
     } else {
         ConnType::PORT_FORWARD
     };
-    let ((mut stream, direct, pk, kcp, _stream_type), (feedback, rendezvous_server)) =
+    let ((mut stream, direct, pk, kcp, _stream_type, _is_local), (feedback, rendezvous_server)) =
         Client::start(id, key, token, conn_type, interface.clone()).await?;
     let mut trust = crate::trusted_devices::client::Session::new(
         &interface.get_lch().read().unwrap(), stream.is_secured(), pk.as_deref())?;
@@ -428,7 +428,7 @@ async fn connect_and_login_mux(
     } else {
         ConnType::PORT_FORWARD
     };
-    let ((mut stream, direct, pk, kcp, _stream_type), (feedback, rendezvous_server)) =
+    let ((mut stream, direct, pk, kcp, _stream_type, _is_local), (feedback, rendezvous_server)) =
         Client::start(id, key, token, conn_type, interface.clone()).await?;
     let mut trust = crate::trusted_devices::client::Session::new(
         &interface.get_lch().read().unwrap(), stream.is_secured(), pk.as_deref())?;

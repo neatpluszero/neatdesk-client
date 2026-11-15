@@ -4235,7 +4235,8 @@ String get appName {
   return _appName;
 }
 
-String getConnectionText(bool secure, bool direct, String streamType) {
+String getConnectionText(bool secure, bool direct, String streamType,
+    {bool lan = false}) {
   String connectionText;
   if (secure && direct) {
     connectionText = translate("Direct and encrypted connection");
@@ -4245,6 +4246,11 @@ String getConnectionText(bool secure, bool direct, String streamType) {
     connectionText = translate("Direct and unencrypted connection");
   } else {
     connectionText = translate("Relayed and unencrypted connection");
+  }
+  // A direct connection over the local network gets a LAN note, so the user can tell it
+  // is not hair-pinning through the internet/relay.
+  if (direct && lan) {
+    connectionText = '$connectionText (${translate('LAN')})';
   }
   if (streamType == 'Relay') {
     streamType = 'TCP';

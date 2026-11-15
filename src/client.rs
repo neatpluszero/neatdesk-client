@@ -384,6 +384,7 @@ impl Client {
             Option<Vec<u8>>,
             Option<KcpStream>,
             &'static str,
+            bool, // is_local: peer is on the local network (LAN)
         ),
         (i32, String),
     )> {
@@ -430,6 +431,7 @@ impl Client {
             Option<Vec<u8>>,
             Option<KcpStream>,
             &'static str,
+            bool, // is_local: peer is on the local network (LAN)
         ),
         (i32, String),
         bool,
@@ -439,14 +441,23 @@ impl Client {
         }
         // to-do: remember the port for each peer, so that we can retry easier
         if hbb_common::is_ip_str(peer) {
+            let target = check_port(peer, RELAY_PORT + 1);
+            // Only a genuinely local hop counts as LAN. With a SOCKS proxy configured the
+            // connect goes through the proxy, so a private literal would be on the proxy's
+            // network, not this controller's — don't claim LAN then.
+            let is_local = Config::get_socks().is_none()
+                && target
+                    .parse::<std::net::SocketAddr>()
+                    .map(|sa| ip_is_lan(sa.ip()))
+                    .unwrap_or(false);
             return Ok((
                 (
-                    connect_tcp_local(check_port(peer, RELAY_PORT + 1), None, CONNECT_TIMEOUT)
-                        .await?,
+                    connect_tcp_local(target, None, CONNECT_TIMEOUT).await?,
                     true,
                     None,
                     None,
                     "TCP",
+                    is_local,
                 ),
                 (0, "".to_owned()),
                 false,
@@ -461,6 +472,11 @@ impl Client {
                     None,
                     None,
                     "TCP",
+                    // Domain connections conservatively report lan=false: resolving the host
+                    // here would leak DNS past a configured proxy and could classify a
+                    // different address than the connection (which resolves again and races
+                    // all candidates) actually selects.
+                    false,
                 ),
                 (0, "".to_owned()),
                 false,
@@ -815,6 +831,7 @@ impl Client {
             Option<Vec<u8>>,
             Option<KcpStream>,
             &'static str,
+            bool, // is_local: peer is on the local network (LAN)
         ),
         (i32, String),
         bool,
@@ -1263,7 +1280,7 @@ impl Client {
                             }
                         }
                         return Ok((
-                            (conn, direct, pk, kcp, typ),
+                            (conn, direct, pk, kcp, typ, is_local),
                             (feedback, rendezvous_server),
                             false,
                         ));
@@ -1433,6 +1450,7 @@ impl Client {
         Option<Vec<u8>>,
         Option<KcpStream>,
         &'static str,
+        bool, // is_local
     )> {
         // Guard the offerer for the whole of connect(): any early return — cancellation during the
         // awaits below, the relay override, or a secure_connection failure — closes its pc via the
@@ -1658,7 +1676,7 @@ impl Client {
             }
         }
         log::debug!("{} punch secure_connection ok", punch_type);
-        Ok((conn, direct, pk, kcp, typ))
+        Ok((conn, direct, pk, kcp, typ, is_local))
     }
 
     /// Establish secure connection with the server.
@@ -5349,6 +5367,48 @@ async fn hc_connection_(
         }
     }
     Ok(())
+}
+
+/// Whether an address is on the local network (private, link-local, or loopback). Used to
+/// flag a direct connection as LAN.
+fn ip_is_lan(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_private() || v4.is_link_local() || v4.is_loopback(),
+        std::net::IpAddr::V6(v6) => {
+            // loopback (::1), ULA (fc00::/7), and link-local (fe80::/10).
+            v6.is_loopback()
+                || (v6.segments()[0] & 0xfe00) == 0xfc00
+                || (v6.segments()[0] & 0xffc0) == 0xfe80
+        }
+    }
+}
+
+#[cfg(test)]
+mod lan_tests {
+    use super::ip_is_lan;
+    use std::net::IpAddr;
+
+    #[test]
+    fn private_link_local_loopback_are_lan_public_is_not() {
+        for s in [
+            "192.168.1.20",
+            "10.0.0.5",
+            "172.16.0.1",
+            "169.254.1.2",
+            "127.0.0.1",
+            "fd00::1",
+            "fe80::1",
+            "::1",
+        ] {
+            assert!(ip_is_lan(s.parse::<IpAddr>().unwrap()), "{s} should be LAN");
+        }
+        for s in ["1.1.1.1", "8.8.8.8", "203.0.113.4", "2606:4700:4700::1111"] {
+            assert!(
+                !ip_is_lan(s.parse::<IpAddr>().unwrap()),
+                "{s} should not be LAN"
+            );
+        }
+    }
 }
 
 pub mod peer_online {

@@ -78,10 +78,13 @@ class ConnectionType {
   final Rx<String> _secure = kInvalidValueStr.obs;
   final Rx<String> _direct = kInvalidValueStr.obs;
   final Rx<String> _stream_type = kInvalidValueStr.obs;
+  // Whether a direct connection is over the local network (LAN). Off unless reported.
+  final RxBool _lan = false.obs;
 
   Rx<String> get secure => _secure;
   Rx<String> get direct => _direct;
   Rx<String> get stream_type => _stream_type;
+  RxBool get lan => _lan;
 
   static String get strSecure => 'secure';
   static String get strInsecure => 'insecure';
@@ -98,6 +101,10 @@ class ConnectionType {
 
   void setStreamType(String v) {
     _stream_type.value = v;
+  }
+
+  void setLan(bool v) {
+    _lan.value = v;
   }
 
   bool isValid() {

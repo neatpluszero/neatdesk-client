@@ -739,12 +739,13 @@ impl InvokeUiSession for FlutterHandler {
         );
     }
 
-    fn set_connection_type(&self, is_secured: bool, direct: bool, stream_type: &str) {
+    fn set_connection_type(&self, is_secured: bool, direct: bool, lan: bool, stream_type: &str) {
         self.push_event(
             "connection_ready",
             &[
                 ("secure", &is_secured.to_string()),
                 ("direct", &direct.to_string()),
+                ("lan", &lan.to_string()),
                 ("stream_type", &stream_type.to_string()),
             ],
             &[],

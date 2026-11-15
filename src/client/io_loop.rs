@@ -204,7 +204,10 @@ impl<T: InvokeUiSession> Remote<T> {
         )
         .await
         {
-            Ok(((mut peer, direct, pk, kcp, stream_type), (feedback, rendezvous_server))) => {
+            Ok((
+                (mut peer, direct, pk, kcp, stream_type, is_local),
+                (feedback, rendezvous_server),
+            )) => {
                 self.handler
                     .connection_round_state
                     .lock()
@@ -235,8 +238,15 @@ impl<T: InvokeUiSession> Remote<T> {
                 } else {
                     stream_type
                 };
+                // A direct connection to a local-network peer is a LAN path. WebRTC races
+                // several candidates and does not expose the winner's address, so its
+                // locality is unknown — never claim LAN for it, to avoid labelling a public
+                // candidate as LAN. (Direct-IP literals are classified at connect time;
+                // domain connects report is_local=false since their resolved address is not
+                // exposed here either.)
+                let lan = direct && is_local && !stream_type.contains("WebRTC");
                 self.handler
-                    .set_connection_type(is_secured, direct, stream_type); // flutter -> connection_ready
+                    .set_connection_type(is_secured, direct, lan, stream_type); // flutter -> connection_ready
                 if !is_secured
                     && !crate::common::is_direct_ip_access(&self.handler.get_id())
                     && !client::confirm_insecure_connection(&self.handler, &mut self.receiver).await

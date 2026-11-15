@@ -66,6 +66,7 @@ class CachedPeerData {
 
   bool secure = false;
   bool direct = false;
+  bool lan = false;
   String streamType = '';
 
   CachedPeerData();
@@ -79,6 +80,7 @@ class CachedPeerData {
       'permissions': permissions,
       'secure': secure,
       'direct': direct,
+      'lan': lan,
       'streamType': streamType,
     });
   }
@@ -95,6 +97,7 @@ class CachedPeerData {
       });
       data.secure = map['secure'];
       data.direct = map['direct'];
+      data.lan = map['lan'] ?? false;
       data.streamType = map['streamType'];
       return data;
     } catch (e) {
@@ -116,6 +119,7 @@ class FfiModel with ChangeNotifier {
   final _permissions = <String, bool>{};
   bool? _secure;
   bool? _direct;
+  bool? _lan;
   bool _touchMode = false;
   late VirtualMouseMode virtualMouseMode;
   Timer? _timer;
@@ -153,6 +157,8 @@ class FfiModel with ChangeNotifier {
   bool? get secure => _secure;
 
   bool? get direct => _direct;
+
+  bool? get lan => _lan;
 
   PeerInfo get pi => _pi;
 
@@ -253,6 +259,7 @@ class FfiModel with ChangeNotifier {
     _cancelPendingMonitorRestore();
     _secure = null;
     _direct = null;
+    _lan = null;
     _inputBlocked = false;
     _timer?.cancel();
     _timer = null;
@@ -265,16 +272,19 @@ class FfiModel with ChangeNotifier {
   }
 
   setConnectionType(
-      String peerId, bool secure, bool direct, String streamType) {
+      String peerId, bool secure, bool direct, bool lan, String streamType) {
     cachedPeerData.secure = secure;
     cachedPeerData.direct = direct;
+    cachedPeerData.lan = lan;
     cachedPeerData.streamType = streamType;
     _secure = secure;
     _direct = direct;
+    _lan = lan;
     try {
       var connectionType = ConnectionTypeState.find(peerId);
       connectionType.setSecure(secure);
       connectionType.setDirect(direct);
+      connectionType.setLan(lan);
       connectionType.setStreamType(streamType);
     } catch (e) {
       //
@@ -289,8 +299,9 @@ class FfiModel with ChangeNotifier {
           '${secure == true ? 'secure' : 'insecure'}${direct == true ? '' : '_relay'}';
       final iconWidget =
           SvgPicture.asset('assets/$icon.svg', width: 48, height: 48);
-      String connectionText =
-          getConnectionText(secure!, direct!, cachedPeerData.streamType);
+      String connectionText = getConnectionText(
+          secure!, direct!, cachedPeerData.streamType,
+          lan: lan ?? false);
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -319,7 +330,8 @@ class FfiModel with ChangeNotifier {
       'link': '',
     }, sessionId, peerId);
     updatePrivacyMode(data.updatePrivacyMode, sessionId, peerId);
-    setConnectionType(peerId, data.secure, data.direct, data.streamType);
+    setConnectionType(
+        peerId, data.secure, data.direct, data.lan, data.streamType);
     await handlePeerInfo(data.peerInfo, peerId, true);
     if (data.lastCursorId.isNotEmpty) {
       updateLastCursorId(data.lastCursorId);
@@ -345,7 +357,8 @@ class FfiModel with ChangeNotifier {
         handlePlatformAdditions(evt, sessionId, peerId);
       } else if (name == 'connection_ready') {
         setConnectionType(peerId, evt['secure'] == 'true',
-            evt['direct'] == 'true', evt['stream_type'] ?? '');
+            evt['direct'] == 'true', evt['lan'] == 'true',
+            evt['stream_type'] ?? '');
         resetRestartReconnectState();
       } else if (name == 'switch_display') {
         // switch display is kept for backward compatibility

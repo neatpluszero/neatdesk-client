@@ -708,7 +708,7 @@ function startChat() {
     chatbox = view.window(params);
 }
 
-handler.setConnectionType = function(secured, direct, stream_type) {
+handler.setConnectionType = function(secured, direct, lan, stream_type) {
     header.update({
        secure_connection: secured,
        direct_connection: direct, 

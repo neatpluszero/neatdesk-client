@@ -156,7 +156,8 @@ class _ViewCameraTabPageState extends State<ViewCameraTabPage> {
             bool direct =
                 connectionType.direct.value == ConnectionType.strDirect;
             String msgConn = getConnectionText(
-                secure, direct, connectionType.stream_type.value);
+                secure, direct, connectionType.stream_type.value,
+                lan: connectionType.lan.value);
             var msgFingerprint = '${translate('Fingerprint')}:\n';
             var fingerprint = FingerprintState.find(key).value;
             if (fingerprint.isEmpty) {
