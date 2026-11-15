@@ -124,7 +124,19 @@ class AllPeersLoader {
   AllPeersLoader({
     @visibleForTesting Future<void> Function(List<String> ids)? queryOnlines,
     @visibleForTesting Duration? queryOnlineDebounce,
-  })  : _queryOnlines = queryOnlines ?? ((ids) => bind.queryOnlines(ids: ids)),
+  })  : _queryOnlines = queryOnlines ??
+            ((ids) {
+              // Don't probe direct-IP peers through autocomplete: it submits more peers than
+              // the small dropdown shows, so their reachability is handled by the peer list's
+              // visible-row probing. Registered-ID presence is unchanged. (Done here, in the
+              // real query path, so a test that injects its own queryOnlines never reaches the
+              // option/FFI lookup.)
+              final toQuery = (!isWeb &&
+                      mainGetLocalBoolOptionSync(kOptionProbeDirectIpReachable))
+                  ? ids.where((id) => !isDirectIpId(id)).toList(growable: false)
+                  : ids;
+              return bind.queryOnlines(ids: toQuery);
+            }),
         _queryOnlineDebounce =
             queryOnlineDebounce ?? _defaultQueryOnlineDebounce;
 
@@ -239,16 +251,10 @@ class AllPeersLoader {
       return;
     }
     _lastQueryOnlineOptions = options.toList(growable: false);
-    var ids = autocompleteOnlineQueryIds(
+    final ids = autocompleteOnlineQueryIds(
       _lastQueryOnlineOptions,
       limit: _maxQueryOnlineOptions,
     ).toSet();
-    // Don't probe direct-IP peers through autocomplete: it submits more peers than the
-    // small dropdown shows, so reachability for them is handled by the peer list's
-    // visible-row probing instead. Registered-ID presence is unchanged.
-    if (!isWeb && mainGetLocalBoolOptionSync(kOptionProbeDirectIpReachable)) {
-      ids = ids.where((id) => !isDirectIpId(id)).toSet();
-    }
     _queryOnlineTimer?.cancel();
     _queryOnlineTimer = null;
     if (ids.isEmpty) {
