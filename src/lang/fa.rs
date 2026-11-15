@@ -826,5 +826,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", "پوشه انتخاب‌شده خالی نیست. نصب ممکن است داده‌های موجود را حذف کند. بهتر است پوشه دیگری انتخاب کنید."),
         ("Request approval", "درخواست تأیید"),
         ("Forever", "برای همیشه"),
+        ("Show reachability of direct-IP peers", ""),
+        ("probe_direct_ip_reachable_tip", ""),
+        ("Reachable", ""),
+        ("Unreachable", ""),
     ].iter().cloned().collect();
 }

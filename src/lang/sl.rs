@@ -826,5 +826,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", "Izbrana mapa ni prazna. Namestitev lahko izbriše obstoječe podatke. Razmislite o izbiri druge mape."),
         ("Request approval", "Zahtevaj odobritev"),
         ("Forever", "Za vedno"),
+        ("Show reachability of direct-IP peers", ""),
+        ("probe_direct_ip_reachable_tip", ""),
+        ("Reachable", ""),
+        ("Unreachable", ""),
     ].iter().cloned().collect();
 }

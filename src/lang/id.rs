@@ -826,5 +826,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", "Folder yang dipilih tidak kosong. Instalasi dapat menghapus data yang ada. Pertimbangkan untuk memilih folder lain."),
         ("Request approval", "Minta persetujuan"),
         ("Forever", "Selamanya"),
+        ("Show reachability of direct-IP peers", ""),
+        ("probe_direct_ip_reachable_tip", ""),
+        ("Reachable", ""),
+        ("Unreachable", ""),
     ].iter().cloned().collect();
 }

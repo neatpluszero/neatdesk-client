@@ -826,5 +826,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", "Folderul selectat nu este gol. Instalarea poate șterge datele existente. Ia în considerare alegerea altui folder."),
         ("Request approval", "Solicită aprobarea"),
         ("Forever", "Pentru totdeauna"),
+        ("Show reachability of direct-IP peers", ""),
+        ("probe_direct_ip_reachable_tip", ""),
+        ("Reachable", ""),
+        ("Unreachable", ""),
     ].iter().cloned().collect();
 }

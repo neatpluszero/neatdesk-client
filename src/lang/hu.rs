@@ -826,5 +826,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", "A kiválasztott mappa nem üres. A telepítés törölheti a meglévő adatokat. Fontolja meg egy másik mappa kiválasztását."),
         ("Request approval", "Jóváhagyás kérése"),
         ("Forever", "Örökre"),
+        ("Show reachability of direct-IP peers", ""),
+        ("probe_direct_ip_reachable_tip", ""),
+        ("Reachable", ""),
+        ("Unreachable", ""),
     ].iter().cloned().collect();
 }

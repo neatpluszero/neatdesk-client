@@ -826,5 +826,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", "Den valda mappen är inte tom. Installationen kan radera befintliga data. Överväg att välja en annan mapp."),
         ("Request approval", "Begär godkännande"),
         ("Forever", "För alltid"),
+        ("Show reachability of direct-IP peers", ""),
+        ("probe_direct_ip_reachable_tip", ""),
+        ("Reachable", ""),
+        ("Unreachable", ""),
     ].iter().cloned().collect();
 }
