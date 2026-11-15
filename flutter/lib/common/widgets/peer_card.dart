@@ -186,7 +186,8 @@ class _PeerCardState extends State<_PeerCard>
                   child: Column(
                     children: [
                       Row(children: [
-                        getOnline(isPortrait ? 4 : 8, peer.online),
+                        getOnline(isPortrait ? 4 : 8, peer.online,
+                            reachabilityOnly: showReachability(peer.id)),
                         Expanded(
                             child: Text(
                           peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
@@ -368,7 +369,8 @@ class _PeerCardState extends State<_PeerCard>
                     children: [
                       Expanded(
                           child: Row(children: [
-                        getOnline(8, peer.online),
+                        getOnline(8, peer.online,
+                            reachabilityOnly: showReachability(peer.id)),
                         Expanded(
                             child: Text(
                           peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
@@ -1489,9 +1491,38 @@ void _rdpDialog(String id) async {
   });
 }
 
-Widget getOnline(double rightPadding, bool online) {
+// Mirror the backend predicates verbatim (hbb_common::is_ipv4_str / is_ipv6_str /
+// is_domain_port_str, used by the probe partitioning in src/client.rs) so Dart classifies a
+// peer exactly as the backend does. IPv4 allows an optional :port; IPv6 is bare or
+// bracketed-with-port; a domain is domain.tld:port. A server-qualified id (contains '@')
+// matches none of these and stays an ID peer, as on the backend.
+final RegExp _ipv4Reg = RegExp(
+    r'^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}(:\d+)?$');
+final RegExp _ipv6Reg = RegExp(
+    r'^((([a-fA-F0-9]{1,4}:{1,2})+[a-fA-F0-9]{1,4})|(\[([a-fA-F0-9]{1,4}:{1,2})+[a-fA-F0-9]{1,4}\]:\d+))$');
+final RegExp _domainPortReg = RegExp(
+    r'^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z-]{0,61}[a-z]:\d{1,5}$',
+    caseSensitive: false);
+
+bool isDirectIpId(String id) =>
+    _ipv4Reg.hasMatch(id) ||
+    _ipv6Reg.hasMatch(id) ||
+    _domainPortReg.hasMatch(id);
+
+// A direct-IP peer's dot reflects a measured reachability probe only when the user has
+// enabled probing on a native client; otherwise its presence comes from hbbs (which can't
+// see it) and keeps the plain Online/Offline label, as before.
+bool showReachability(String id) =>
+    isDirectIpId(id) &&
+    !isWeb &&
+    mainGetLocalBoolOptionSync(kOptionProbeDirectIpReachable);
+
+Widget getOnline(double rightPadding, bool online,
+    {bool reachabilityOnly = false}) {
   return Tooltip(
-      message: translate(online ? 'Online' : 'Offline'),
+      message: translate(reachabilityOnly
+          ? (online ? 'Reachable' : 'Unreachable')
+          : (online ? 'Online' : 'Offline')),
       waitDuration: const Duration(seconds: 1),
       child: Padding(
           padding: EdgeInsets.fromLTRB(0, 4, rightPadding, 4),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
+import 'package:flutter_hbb/consts.dart';
 import '../../../models/platform_model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/common.dart';
@@ -238,10 +239,16 @@ class AllPeersLoader {
       return;
     }
     _lastQueryOnlineOptions = options.toList(growable: false);
-    final ids = autocompleteOnlineQueryIds(
+    var ids = autocompleteOnlineQueryIds(
       _lastQueryOnlineOptions,
       limit: _maxQueryOnlineOptions,
     ).toSet();
+    // Don't probe direct-IP peers through autocomplete: it submits more peers than the
+    // small dropdown shows, so reachability for them is handled by the peer list's
+    // visible-row probing instead. Registered-ID presence is unchanged.
+    if (!isWeb && mainGetLocalBoolOptionSync(kOptionProbeDirectIpReachable)) {
+      ids = ids.where((id) => !isDirectIpId(id)).toSet();
+    }
     _queryOnlineTimer?.cancel();
     _queryOnlineTimer = null;
     if (ids.isEmpty) {
@@ -353,8 +360,18 @@ class AutocompletePeerTileState extends State<AutocompletePeerTile> {
                                                   margin:
                                                       EdgeInsets.only(top: 2),
                                                   child: Row(children: [
-                                                    getOnline(
-                                                        8, widget.peer.online),
+                                                    // Autocomplete can't reliably measure a
+                                                    // direct endpoint (only visible peer cards
+                                                    // probe, and this row's card may not be
+                                                    // visible), so while probing is on it omits
+                                                    // the dot for direct endpoints rather than
+                                                    // present the default boolean as a
+                                                    // reachability or presence result. ID peers
+                                                    // (and the probing-off case) keep the normal
+                                                    // Online/Offline dot.
+                                                    if (!showReachability(widget.peer.id))
+                                                      getOnline(
+                                                          8, widget.peer.online),
                                                     Expanded(
                                                         child: Text(
                                                       widget.peer.alias.isEmpty

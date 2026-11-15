@@ -97,6 +97,10 @@ class _PeersViewState extends State<_PeersView>
   });
   final space = (isDesktop || isWebDesktop) ? 12.0 : 8.0;
   final _curPeers = <String>{};
+  // Peers whose cards are actually on screen (maintained only by VisibilityDetector, never
+  // bulk-filled on load like _curPeers). Direct-IP reachability probing is bounded to these
+  // so a large address-book load does not probe offscreen peers.
+  final _visiblePeers = <String>{};
   var _lastChangeTime = DateTime.now();
   var _lastQueryPeers = <String>{};
   var _lastQueryTime = DateTime.now();
@@ -219,8 +223,10 @@ class _PeersViewState extends State<_PeersView>
     final peerId = _peerId((info.key as ValueKey).value);
     if (info.visibleFraction > 0.00001) {
       _curPeers.add(peerId);
+      _visiblePeers.add(peerId);
     } else {
       _curPeers.remove(peerId);
+      _visiblePeers.remove(peerId);
     }
     _lastChangeTime = DateTime.now();
   }
@@ -330,13 +336,19 @@ class _PeersViewState extends State<_PeersView>
           final skipIfMobile =
               (isAndroid || isIOS) && !stateGlobal.isInMainPage;
           final skipIfNotActive = skipIfIsWeb || skipIfMobile || !_isActive;
-          if (!skipIfNotActive && (_queryCount < _maxQueryCount || !p)) {
-            if (now.difference(_lastQueryTime) >= _queryInterval) {
-              if (_curPeers.isNotEmpty) {
-                bind.queryOnlines(ids: _curPeers.toList(growable: false));
-                _lastQueryTime = DateTime.now();
-                _queryCount += 1;
-              }
+          if (!skipIfNotActive &&
+              now.difference(_lastQueryTime) >= _queryInterval) {
+            final withinIdBudget = _queryCount < _maxQueryCount || !p;
+            // Within the ID-presence budget: one mixed query (IDs + visible direct peers).
+            // Past it (public server, static list): keep probing visible direct-IP peers only
+            // — those are local connections, not a load on the public server — so their
+            // reachability stays fresh without re-polling registered IDs. Always a single
+            // query per tick, so nothing contends for the backend's single-slot runner.
+            final ids = withinIdBudget ? _queryIds() : _visibleDirectIds();
+            if (ids.isNotEmpty) {
+              bind.queryOnlines(ids: ids);
+              _lastQueryTime = DateTime.now();
+              if (withinIdBudget) _queryCount += 1;
             }
           }
         }
@@ -345,9 +357,50 @@ class _PeersViewState extends State<_PeersView>
     }();
   }
 
+  // Ids to query for presence: registered-ID peers plus the confirmed-visible direct-IP
+  // peers (never the load-injected offscreen ones in _curPeers). A single mixed query lets
+  // the backend partition it — hbbs for IDs, a throttled direct TCP probe for direct
+  // endpoints — without two queries competing for its single-slot query runner. With probing
+  // off, every id goes to hbbs exactly as before.
+  List<String> _queryIds() {
+    final probing =
+        !isWeb && mainGetLocalBoolOptionSync(kOptionProbeDirectIpReachable);
+    if (!probing) {
+      return _curPeers.toList(growable: false);
+    }
+    // Registered IDs always; direct-IP peers only when visible AND the view is foreground,
+    // because probing them makes a real connection. This gate also covers the load/change
+    // query paths, which run outside the steady-loop's skip check.
+    final ids = _curPeers.where((id) => !isDirectIpId(id)).toSet();
+    if (_probeForeground()) {
+      ids.addAll(_visiblePeers.where(isDirectIpId));
+    }
+    return ids.toList(growable: false);
+  }
+
+  // Confirmed-visible direct-IP peers to probe (empty unless probing is enabled and the view
+  // is foreground).
+  List<String> _visibleDirectIds() {
+    final probing =
+        !isWeb && mainGetLocalBoolOptionSync(kOptionProbeDirectIpReachable);
+    if (!probing || !_probeForeground()) return const [];
+    return _visiblePeers.where(isDirectIpId).toList(growable: false);
+  }
+
+  // Same foreground/visibility condition the steady loop uses before querying, so direct-IP
+  // probing never runs while the view or app is in the background.
+  bool _probeForeground() {
+    final skipIfIsWeb =
+        isWeb && !(stateGlobal.isWebVisible && stateGlobal.isInMainPage);
+    final skipIfMobile =
+        (isAndroid || isIOS) && !stateGlobal.isInMainPage;
+    return !(skipIfIsWeb || skipIfMobile || !_isActive);
+  }
+
   _queryOnlines(bool isLoadEvent) {
-    if (_curPeers.isNotEmpty) {
-      bind.queryOnlines(ids: _curPeers.toList(growable: false));
+    final ids = _queryIds();
+    if (ids.isNotEmpty) {
+      bind.queryOnlines(ids: ids);
       _queryCount = 0;
     }
     _lastQueryPeers = {..._curPeers};

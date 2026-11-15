@@ -832,5 +832,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("No connection trace yet", ""),
         ("connect_timeout_tip", ""),
         ("Connect via relay", ""),
+        ("Show reachability of direct-IP peers", ""),
+        ("probe_direct_ip_reachable_tip", ""),
+        ("Reachable", ""),
+        ("Unreachable", ""),
     ].iter().cloned().collect();
 }

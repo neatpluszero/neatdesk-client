@@ -560,6 +560,15 @@ class _GeneralState extends State<_General> {
             isServer: false,
           ),
         ),
+        Tooltip(
+          message: translate('probe_direct_ip_reachable_tip'),
+          child: _OptionCheckBox(
+            context,
+            'Show reachability of direct-IP peers',
+            kOptionProbeDirectIpReachable,
+            isServer: false,
+          ),
+        ),
         // though this is related to GUI, but opengl problem affects all users, so put in config rather than local
         if (isLinux)
           Tooltip(

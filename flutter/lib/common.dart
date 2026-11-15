@@ -1620,6 +1620,9 @@ bool option2bool(String option, String value) {
   } else if (option.startsWith("allow-") ||
       option == kOptionStopService ||
       option == kOptionDirectServer ||
+      // Off by default: the backend enables the reachability probe only for "Y"
+      // (src/client.rs), so an unset value must decode to false here too.
+      option == kOptionProbeDirectIpReachable ||
       option == kOptionForceAlwaysRelay) {
     res = value == "Y";
   } else {
